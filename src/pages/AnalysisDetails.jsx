@@ -177,7 +177,7 @@ const AnalysisDetails = () => {
       </div>
 
       {/* Records Table */}
-      <div className="bg-white rounded-lg shadow-sm border">
+      <div className="bg-white rounded-lg shadow-sm border pb-4">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Analysis Records</h2>
         </div>

@@ -168,7 +168,7 @@ const Home = () => {
 
       {/* Analysis Jobs Table */}
       {analysisJobs.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border mt-8">
+        <div className="bg-white rounded-lg shadow-sm border mt-8 pb-4">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Recent Analysis Jobs</h2>
           </div>
