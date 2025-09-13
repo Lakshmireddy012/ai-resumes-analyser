@@ -35,27 +35,3 @@ export const setDefaultConfiguration = (index) => {
   localStorage.setItem('llmConfigurations', JSON.stringify(configs));
 };
 
-// Test connection utility
-export const testLLMConnection = async (config) => {
-  try {
-    const { ChatOllama } = await import('@langchain/community/chat_models/ollama');
-    
-    const model = new ChatOllama({
-      baseUrl: config.baseUrl,
-      model: config.model,
-      temperature: parseFloat(config.temperature),
-    });
-
-    const response = await model.invoke("Hello, this is a test message.");
-    return { 
-      success: true, 
-      message: 'Connection successful!', 
-      response: response.content 
-    };
-  } catch (error) {
-    return { 
-      success: false, 
-      message: `Connection failed: ${error.message}` 
-    };
-  }
-};

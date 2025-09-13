@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatAnthropic } from "@langchain/anthropic";
-import { ChatOllama } from "@langchain/ollama";
-import { ChatMistralAI } from "@langchain/mistralai";
-import { ChatCohere } from "@langchain/cohere";
+import { createChatModel } from '../services/llmFactory';
 
-const Settings = () => {
+const Settings = ({ onSave }) => {
   const [configurations, setConfigurations] = useState([]);
   const [currentConfig, setCurrentConfig] = useState({
     name: '',
@@ -13,9 +9,13 @@ const Settings = () => {
     baseUrl: 'http://localhost:11434',
     apiKey: '',
     model: 'llama3.1',
-    temperature: 0.7,
+    temperature: 0.2,
     maxTokens: 2048,
-    isDefault: false
+    isDefault: false,
+    // Azure-specific fields
+    deploymentName: '',
+    apiVersion: '',
+    instanceName: ''
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editingIndex, setEditingIndex] = useState(-1);
@@ -41,45 +41,13 @@ const Settings = () => {
     }));
   };
 
-  const getChatModel = (config) => {
-    const { provider, baseUrl, model, temperature, apiKey } = config;
-  
-    switch (provider) {
-      case "openai":
-        return new ChatOpenAI({
-          model,
-          temperature: parseFloat(temperature),
-          apiKey,
-          baseUrl,
-        });
-      case "anthropic":
-        return new ChatAnthropic({
-          model,
-          temperature: parseFloat(temperature),
-          apiKey,
-        });
-      case "ollama":
-        return new ChatOllama({
-          baseUrl,
-          model,
-          temperature: parseFloat(temperature),
-        });
-      case "mistral":
-          return new ChatMistralAI({ model, apiKey });
-      case "cohere":
-          return new ChatCohere({ model, apiKey });
-      default:
-        throw new Error(`Unsupported provider: ${provider}`);
-    }
-  };
-  
   const handleTestConnection = async () => {
     setIsTesting(true);
     setTestResult(null);
-  
+
     try {
-      const model = getChatModel(currentConfig);
-  
+      const model = await createChatModel(currentConfig);
+
       const response = await model.invoke("Hello, this is a test message.");
       setTestResult({
         success: true,
@@ -96,32 +64,6 @@ const Settings = () => {
     }
   };
 
-  // const handleTestConnection = async () => {
-  //   setIsTesting(true);
-  //   setTestResult(null);
-    
-  //   try {
-  //     // Test connection using LangChain
-  //     const { ChatOllama } = await import('@langchain/community/chat_models/ollama');
-      
-  //     const model = new ChatOllama({
-  //       baseUrl: currentConfig.baseUrl,
-  //       model: currentConfig.model,
-  //       temperature: parseFloat(currentConfig.temperature),
-  //     });
-
-  //     const response = await model.invoke("Hello, this is a test message.");
-  //     setTestResult({ success: true, message: 'Connection successful!', response: response.content });
-  //   } catch (error) {
-  //     setTestResult({ 
-  //       success: false, 
-  //       message: `Connection failed: ${error.message}` 
-  //     });
-  //   } finally {
-  //     setIsTesting(false);
-  //   }
-  // };
-
   const handleSave = () => {
     if (!currentConfig.name.trim()) {
       alert('Please enter a configuration name');
@@ -129,11 +71,10 @@ const Settings = () => {
     }
 
     const newConfigs = [...configurations];
-    
+
     if (isEditing) {
       newConfigs[editingIndex] = { ...currentConfig };
     } else {
-      // If this is set as default, remove default from others
       if (currentConfig.isDefault) {
         newConfigs.forEach(config => config.isDefault = false);
       }
@@ -142,8 +83,7 @@ const Settings = () => {
 
     setConfigurations(newConfigs);
     localStorage.setItem('llmConfigurations', JSON.stringify(newConfigs));
-    
-    // Reset form
+    onSave();
     setCurrentConfig({
       name: '',
       provider: 'ollama',
@@ -152,7 +92,10 @@ const Settings = () => {
       model: 'llama3.1',
       temperature: 0.7,
       maxTokens: 2048,
-      isDefault: false
+      isDefault: false,
+      deploymentName: '',
+      apiVersion: '2024-02-15-preview',
+      instanceName: ''
     });
     setIsEditing(false);
     setEditingIndex(-1);
@@ -200,127 +143,176 @@ const Settings = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
             {isEditing ? 'Edit Configuration' : 'Add New Configuration'}
           </h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Configuration Name
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={currentConfig.name}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Local Ollama"
-              />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Provider
-              </label>
-              <select
-                name="provider"
-                value={currentConfig.provider}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="ollama">Ollama (Local)</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Base URL
-              </label>
-              <input
-                type="url"
-                name="baseUrl"
-                value={currentConfig.baseUrl}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="http://localhost:11434"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                API Key (if required)
-              </label>
-              <input
-                type="password"
-                name="apiKey"
-                value={currentConfig.apiKey}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Your API key"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Model
-              </label>
-              <input
-                type="text"
-                name="model"
-                value={currentConfig.model}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="llama3.1"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <form className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Temperature
+                  Configuration Name
                 </label>
                 <input
-                  type="number"
-                  name="temperature"
-                  value={currentConfig.temperature}
+                  type="text"
+                  name="name"
+                  value={currentConfig.name}
                   onChange={handleInputChange}
-                  min="0"
-                  max="2"
-                  step="0.1"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Local Ollama"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Tokens
+                  Provider
+                </label>
+                <select
+                  name="provider"
+                  value={currentConfig.provider}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ollama">Ollama (Local)</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="mistral">Mistral</option>
+                  <option value="cohere">Cohere</option>
+                  <option value="azure">Azure</option>
+                </select>
+              </div>
+
+              {currentConfig.provider === 'azure' ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Instance Name
+                    </label>
+                    <input
+                      type="text"
+                      name="instanceName"
+                      value={currentConfig.instanceName}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="oai-playground-dev-01"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Deployment Name
+                    </label>
+                    <input
+                      type="text"
+                      name="deploymentName"
+                      value={currentConfig.deploymentName}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="gpt-4o"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      API Version
+                    </label>
+                    <input
+                      type="text"
+                      name="apiVersion"
+                      value={currentConfig.apiVersion}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="2024-02-15-preview"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Base URL
+                    </label>
+                    <input
+                      type="url"
+                      name="baseUrl"
+                      value={currentConfig.baseUrl}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="http://localhost:11434"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Model
+                    </label>
+                    <input
+                      type="text"
+                      name="model"
+                      value={currentConfig.model}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="llama3.1"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  API Key (if required)
                 </label>
                 <input
-                  type="number"
-                  name="maxTokens"
-                  value={currentConfig.maxTokens}
+                  type="password"
+                  name="apiKey"
+                  value={currentConfig.apiKey}
                   onChange={handleInputChange}
-                  min="100"
-                  max="4096"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Your API key"
                 />
               </div>
-            </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                name="isDefault"
-                checked={currentConfig.isDefault}
-                onChange={handleInputChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label className="ml-2 block text-sm text-gray-700">
-                Set as default configuration
-              </label>
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Temperature
+                  </label>
+                  <input
+                    type="number"
+                    name="temperature"
+                    value={currentConfig.temperature}
+                    onChange={handleInputChange}
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Max Tokens
+                  </label>
+                  <input
+                    type="number"
+                    name="maxTokens"
+                    value={currentConfig.maxTokens}
+                    onChange={handleInputChange}
+                    min="100"
+                    max="4096"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center my-4">
+                <input
+                  type="checkbox"
+                  name="isDefault"
+                  checked={currentConfig.isDefault}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label className="ml-2 block text-sm text-gray-700">
+                  Set as default configuration
+                </label>
+              </div>
+            </form>
 
             {/* Test Connection */}
-            <div className="pt-4 border-t">
+            <div className="pb-4">
               <button
                 onClick={handleTestConnection}
                 disabled={isTesting}
@@ -328,13 +320,12 @@ const Settings = () => {
               >
                 {isTesting ? 'Testing...' : 'Test Connection'}
               </button>
-              
+
               {testResult && (
-                <div className={`mt-2 p-3 rounded-md text-sm ${
-                  testResult.success 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
+                <div className={`mt-2 p-3 rounded-md text-sm ${testResult.success
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-red-100 text-red-800'
+                  }`}>
                   {testResult.message}
                 </div>
               )}
@@ -361,7 +352,10 @@ const Settings = () => {
                       model: 'llama3.1',
                       temperature: 0.7,
                       maxTokens: 2048,
-                      isDefault: false
+                      isDefault: false,
+                      deploymentName: '',
+                      apiVersion: '2024-02-15-preview',
+                      instanceName: ''
                     });
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
@@ -370,7 +364,6 @@ const Settings = () => {
                 </button>
               )}
             </div>
-          </div>
         </div>
 
         {/* Saved Configurations */}
@@ -378,7 +371,7 @@ const Settings = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
             Saved Configurations
           </h2>
-          
+
           {configurations.length === 0 ? (
             <p className="text-gray-500 text-center py-8">
               No configurations saved yet
@@ -399,6 +392,9 @@ const Settings = () => {
                       </h3>
                       <p className="text-sm text-gray-500">
                         {config.provider} • {config.model}
+                        {config.provider === 'azure' && config.deploymentName && (
+                          <span> • {config.deploymentName}</span>
+                        )}
                       </p>
                     </div>
                     <div className="flex space-x-2">

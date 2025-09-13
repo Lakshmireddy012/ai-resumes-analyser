@@ -1,4 +1,6 @@
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
+import { createChatModel } from "./llmFactory.js";
+import { getDefaultConfiguration } from "../utils/llmConfig.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 // PDF Extraction Service for resume analysis
@@ -84,17 +86,13 @@ export class PDFExtractionService {
 
   async extractStructuredData(text, jobDetails) {
     try {
-      // Get LLM configuration
-      const { getDefaultConfiguration } = await import('../utils/llmConfig.js');
       const llmConfig = getDefaultConfiguration();
       
       if (!llmConfig) {
         throw new Error('No LLM configuration found');
       }
 
-      // Initialize LLM
-      const { aiAnalysisService } = await import('./aiAnalysisService.js');
-      const model = await aiAnalysisService.initializeLLM(llmConfig);
+      const model = await createChatModel(llmConfig);
 
       // Create extraction prompt
       const prompt = this.buildExtractionPrompt(text, jobDetails);

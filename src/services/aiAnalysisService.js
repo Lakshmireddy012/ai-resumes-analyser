@@ -1,4 +1,5 @@
 import { getDefaultConfiguration } from '../utils/llmConfig.js';
+import { createChatModel } from './llmFactory.js';
 
 // AI Analysis Service for processing resumes
 export class AIAnalysisService {
@@ -31,7 +32,7 @@ export class AIAnalysisService {
       }
 
       // Initialize LLM
-      const model = await this.initializeLLM(llmConfig);
+      const model = await createChatModel(llmConfig);
 
       // Check if we have extracted resume data to process
       if (!extractedResumeData || extractedResumeData.length === 0) {
@@ -94,36 +95,6 @@ export class AIAnalysisService {
     if (this.currentAnalysisId) {
       const { updateAnalysisStatus } = await import('../utils/analysisStorage.js');
       updateAnalysisStatus(this.currentAnalysisId, 'stopped');
-    }
-  }
-
-  async initializeLLM(config) {
-    try {
-      if (config.provider === 'ollama') {
-        const { ChatOllama } = await import('@langchain/ollama');
-        return new ChatOllama({
-          baseUrl: config.baseUrl,
-          model: config.model,
-          temperature: parseFloat(config.temperature),
-        });
-      } else if (config.provider === 'openai') {
-        const { ChatOpenAI } = await import('@langchain/openai');
-        return new ChatOpenAI({
-          apiKey: config.apiKey,
-          model: config.model,
-          temperature: parseFloat(config.temperature),
-        });
-      } else if (config.provider === 'anthropic') {
-        const { ChatAnthropic } = await import('@langchain/anthropic');
-        return new ChatAnthropic({
-          apiKey: config.apiKey,
-          model: config.model,
-          temperature: parseFloat(config.temperature),
-        });
-      }
-      throw new Error(`Unsupported provider: ${config.provider}`);
-    } catch (error) {
-      throw new Error(`Failed to initialize LLM: ${error.message}`);
     }
   }
 
