@@ -1,0 +1,61 @@
+{
+  "name": "AI Resume Analyzer",
+  "short_name": "Resume Analyzer",
+  "description": "Intelligent PDF resume analysis tool with AI-powered insights for HR professionals and recruiters",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshot2.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Analysis",
+      "short_name": "Analyze",
+      "description": "Start a new resume analysis",
+      "url": "/analysis",
+      "icons": [
+        {
+          "src": "/vite.svg",
+          "sizes": "any"
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "short_name": "Settings",
+      "description": "Configure LLM settings",
+      "url": "/settings",
+      "icons": [
+        {
+          "src": "/vite.svg",
+          "sizes": "any"
+        }
+      ]
+    }
+  ]
+}
