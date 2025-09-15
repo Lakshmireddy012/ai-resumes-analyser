@@ -5,15 +5,11 @@ import Settings from './pages/Settings';
 import Analysis from './pages/Analysis';
 import AnalysisDetails from './pages/AnalysisDetails';
 import PdfReader from './pages/PdfReader';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 function App() {
-  const [savedConfigs, setSavedConfigs] = useState([]);
-
   const fetchLatestSettings = () => JSON.parse(localStorage.getItem('llmConfigurations') || '[]');
-  useEffect(() => {
-    setSavedConfigs(fetchLatestSettings());
-  }, []);
+  const [savedConfigs, setSavedConfigs] = useState(fetchLatestSettings());
 
   const handleSaveConfigs = () => {
     setSavedConfigs(fetchLatestSettings());

@@ -55,7 +55,7 @@ export class PDFExtractionService {
     }
   }
 
-  async extractResumeData(file, jobDetails) {
+  async extractResumeData(file, jobDetails, resumeFields = {}) {
     try {
       // Extract text from PDF
       const pdfResult = await this.extractTextFromPDF(file);
@@ -65,7 +65,7 @@ export class PDFExtractionService {
       }
 
       // Use AI to extract structured resume data
-      const resumeData = await this.extractStructuredData(pdfResult.text, jobDetails);
+      const resumeData = await this.extractStructuredData(pdfResult.text, jobDetails, resumeFields);
       
       return {
         success: true,
@@ -84,7 +84,7 @@ export class PDFExtractionService {
     }
   }
 
-  async extractStructuredData(text, jobDetails) {
+  async extractStructuredData(text, jobDetails, resumeFields = {}) {
     try {
       const llmConfig = getDefaultConfiguration();
       
@@ -95,7 +95,7 @@ export class PDFExtractionService {
       const model = await createChatModel(llmConfig);
 
       // Create extraction prompt
-      const prompt = this.buildExtractionPrompt(text, jobDetails);
+      const prompt = this.buildExtractionPrompt(text, jobDetails, resumeFields);
       
       // Get AI response
       const response = await model.invoke(prompt);
@@ -109,47 +109,131 @@ export class PDFExtractionService {
     }
   }
 
-  buildExtractionPrompt(text, jobDetails) {
-    return `Please extract structured information from the following resume text and return it as JSON.
+  buildExtractionPrompt(text, jobDetails, resumeFields = {}) {
+    const schema = {};
+
+    if (resumeFields.contactInformation) {
+      schema.fullName = "Full name of the candidate";
+      schema.email = "Email address";
+      schema.phone = "Phone number";
+      schema.address = "Mailing address";
+      schema.linkedin = "LinkedIn profile URL";
+      schema.github = "GitHub profile URL";
+      schema.website = "Personal website or portfolio URL";
+    }
+
+    if (resumeFields.professionalSummary) {
+      schema.summary = "Professional summary or objective";
+      schema.currentRole = "Current job title or role";
+      schema.experience = "Total years of experience (number or string)";
+    }
+
+    if (resumeFields.education) {
+      schema.education = [
+        {
+          institution: "University or institution name",
+          degree: "Degree name",
+          fieldOfStudy: "Field of study",
+          graduationYear: "YYYY",
+          gpa: "GPA if present",
+          location: "City, State/Country",
+          honors: "Honors if any"
+        }
+      ];
+    }
+
+    if (resumeFields.workExperience) {
+      schema.workExperience = [
+        {
+          company: "Company name",
+          position: "Job title",
+          startDate: "YYYY-MM if available else best effort",
+          endDate: "YYYY-MM or null if current",
+          current: false,
+          location: "City, State/Country",
+          description: "Key responsibilities and scope",
+          achievements: ["Achievement 1", "Achievement 2"],
+          technologies: ["Tech1", "Tech2"]
+        }
+      ];
+    }
+
+    if (resumeFields.projects) {
+      schema.projects = [
+        {
+          name: "Project name",
+          description: "Project description",
+          technologies: ["Tech1", "Tech2"],
+          url: "Project URL if any",
+          date: "YYYY or YYYY-MM if any"
+        }
+      ];
+    }
+
+    if (resumeFields.certifications) {
+      schema.certifications = [
+        {
+          name: "Certification name",
+          issuer: "Issuing organization",
+          date: "YYYY or YYYY-MM",
+          expiryDate: "YYYY or YYYY-MM if applicable"
+        }
+      ];
+    }
+
+    if (resumeFields.languages) {
+      schema.languages = [
+        { language: "Language name", proficiency: "Basic/Conversational/Fluent/Native" }
+      ];
+    }
+
+    if (resumeFields.publications) {
+      schema.publications = [
+        { title: "Title", journal: "Journal/Publisher", date: "YYYY", url: "URL if any" }
+      ];
+    }
+
+    if (resumeFields.awards) {
+      schema.awards = [
+        { name: "Award name", issuer: "Organization", date: "YYYY" }
+      ];
+    }
+
+    if (resumeFields.volunteerExperience) {
+      schema.volunteerExperience = [
+        {
+          organization: "Organization name",
+          role: "Volunteer role",
+          startDate: "YYYY or YYYY-MM",
+          endDate: "YYYY or YYYY-MM",
+          description: "What was done"
+        }
+      ];
+    }
+
+    if (Array.isArray(resumeFields.customResumeFields)) {
+      resumeFields.customResumeFields.forEach(field => {
+        if (field?.name) {
+          const key = field.name.toLowerCase().replace(/\s+/g, '_');
+          schema[key] = `Value for ${field.name}`;
+        }
+      });
+    }
+
+    const schemaJson = JSON.stringify(schema, null, 2);
+
+    return `You are extracting resume data. Return ONLY valid JSON matching the schema below. Prefer exact facts; do not hallucinate. If unknown, use "N/A" or [] accordingly.
 
 JOB CONTEXT:
 Title: ${jobDetails.title}
 Description: ${jobDetails.description || 'N/A'}
 Requirements: ${jobDetails.requirements || 'N/A'}
 
+SCHEMA TO RETURN:
+${schemaJson}
+
 RESUME TEXT:
-${text}
-
-Please extract the following information and return as valid JSON:
-{
-  "fullName": "Full name of the candidate",
-  "email": "Email address",
-  "phone": "Phone number",
-  "currentRole": "Current job title/position",
-  "experience": "Years of experience",
-  "education": "Educational background",
-  "skills": ["skill1", "skill2", "skill3"],
-  "workExperience": [
-    {
-      "company": "Company name",
-      "position": "Job title",
-      "duration": "Time period",
-      "description": "Job description"
-    }
-  ],
-  "projects": [
-    {
-      "name": "Project name",
-      "description": "Project description",
-      "technologies": ["tech1", "tech2"]
-    }
-  ],
-  "certifications": ["cert1", "cert2"],
-  "languages": ["language1", "language2"],
-  "summary": "Professional summary or objective"
-}
-
-Please ensure the response is valid JSON and extract as much relevant information as possible.`;
+${text}`;
   }
 
   parseExtractionResponse(response) {

@@ -29,10 +29,28 @@ const Analysis = () => {
     strengths: true,
     weaknesses: true,
     recommendations: true,
-    // Custom fields
-    customFields: []
+    // Custom analysis fields
+    customAnalysisFields: []
   });
-  const [newCustomField, setNewCustomField] = useState('');
+  const [newCustomAnalysisField, setNewCustomAnalysisField] = useState('');
+  
+  const [resumeFields, setResumeFields] = useState({
+    // Default resume fields
+    contactInformation: true,
+    professionalSummary: true,
+    workExperience: true,
+    education: true,
+    skills: true,
+    certifications: true,
+    projects: true,
+    languages: true,
+    publications: true,
+    awards: true,
+    volunteerExperience: true,
+    // Custom resume fields
+    customResumeFields: []
+  });
+  const [newCustomResumeField, setNewCustomResumeField] = useState('');
 
   const defaultFields = [
     { key: 'fullName', label: 'Full Name' },
@@ -47,27 +65,35 @@ const Analysis = () => {
     { key: 'recommendations', label: 'Recommendations' }
   ];
 
-  const resumeFields = [
-    'Contact Information',
-    'Professional Summary',
-    'Work Experience',
-    'Education',
-    'Skills',
-    'Certifications',
-    'Projects',
-    'Languages',
-    'Publications',
-    'Awards',
-    'Volunteer Experience'
+  const defaultResumeFields = [
+    { key: 'contactInformation', label: 'Contact Information' },
+    { key: 'professionalSummary', label: 'Professional Summary' },
+    { key: 'workExperience', label: 'Work Experience' },
+    { key: 'education', label: 'Education' },
+    { key: 'skills', label: 'Skills' },
+    { key: 'certifications', label: 'Certifications' },
+    { key: 'projects', label: 'Projects' },
+    { key: 'languages', label: 'Languages' },
+    { key: 'publications', label: 'Publications' },
+    { key: 'awards', label: 'Awards' },
+    { key: 'volunteerExperience', label: 'Volunteer Experience' }
   ];
 
   useEffect(() => {
     // Load saved custom fields
-    const savedCustomFields = localStorage.getItem('customAnalysisFields');
-    if (savedCustomFields) {
+    const savedCustomAnalysisFields = localStorage.getItem('customAnalysisFields');
+    if (savedCustomAnalysisFields) {
       setOutputFields(prev => ({
         ...prev,
-        customFields: JSON.parse(savedCustomFields)
+        customAnalysisFields: JSON.parse(savedCustomAnalysisFields)
+      }));
+    }
+
+    const savedCustomResumeFields = localStorage.getItem('customResumeFields');
+    if (savedCustomResumeFields) {
+      setResumeFields(prev => ({
+        ...prev,
+        customResumeFields: JSON.parse(savedCustomResumeFields)
       }));
     }
 
@@ -78,7 +104,33 @@ const Analysis = () => {
       if (existingJob) {
         setIsUsingExistingJob(true);
         setJobDetails(existingJob.jobDetails || {});
-        setOutputFields(existingJob.outputFields || outputFields);
+        setOutputFields(existingJob.outputFields || {
+          fullName: true,
+          currentRole: true,
+          overallScore: true,
+          skillsMatch: true,
+          experienceMatch: true,
+          educationMatch: true,
+          summary: true,
+          strengths: true,
+          weaknesses: true,
+          recommendations: true,
+          customAnalysisFields: []
+        });
+        setResumeFields(existingJob.resumeFields || {
+          contactInformation: true,
+          professionalSummary: true,
+          workExperience: true,
+          education: true,
+          skills: true,
+          certifications: true,
+          projects: true,
+          languages: true,
+          publications: true,
+          awards: true,
+          volunteerExperience: true,
+          customResumeFields: []
+        });
         // Don't pre-fill analysis title - let user create new one
         // Don't pre-fill files - user needs to select new resumes
       }
@@ -100,25 +152,54 @@ const Analysis = () => {
     }));
   };
 
-  const handleAddCustomField = () => {
-    if (newCustomField.trim()) {
+  const handleResumeFieldChange = (fieldKey) => {
+    setResumeFields(prev => ({
+      ...prev,
+      [fieldKey]: !prev[fieldKey]
+    }));
+  };
+
+  const handleAddCustomAnalysisField = () => {
+    if (newCustomAnalysisField.trim()) {
       const customField = {
         id: Date.now(),
-        name: newCustomField.trim(),
+        name: newCustomAnalysisField.trim(),
         type: 'text'
       };
       setOutputFields(prev => ({
         ...prev,
-        customFields: [...prev.customFields, customField]
+        customAnalysisFields: [...prev.customAnalysisFields, customField]
       }));
-      setNewCustomField('');
+      setNewCustomAnalysisField('');
     }
   };
 
-  const handleRemoveCustomField = (id) => {
+  const handleRemoveCustomAnalysisField = (id) => {
     setOutputFields(prev => ({
       ...prev,
-      customFields: prev.customFields.filter(field => field.id !== id)
+      customAnalysisFields: prev.customAnalysisFields.filter(field => field.id !== id)
+    }));
+  };
+
+  const handleAddCustomResumeField = () => {
+    if (newCustomResumeField.trim()) {
+      const customField = {
+        id: Date.now(),
+        name: newCustomResumeField.trim(),
+        type: 'text'
+      };
+      setResumeFields(prev => ({
+        ...prev,
+        customResumeFields: [...prev.customResumeFields, customField]
+      }));
+      setNewCustomResumeField('');
+    }
+  };
+
+  const handleRemoveCustomResumeField = (id) => {
+    setResumeFields(prev => ({
+      ...prev,
+      customResumeFields: prev.customResumeFields.filter(field => field.id !== id)
     }));
   };
 
@@ -152,7 +233,8 @@ const Analysis = () => {
     }
 
     // Save custom fields
-    localStorage.setItem('customAnalysisFields', JSON.stringify(outputFields.customFields));
+    localStorage.setItem('customAnalysisFields', JSON.stringify(outputFields.customAnalysisFields));
+    localStorage.setItem('customResumeFields', JSON.stringify(resumeFields.customResumeFields));
 
     // Convert files to a format that can be stored
     const filesData = selectedFiles.map(file => ({
@@ -168,6 +250,7 @@ const Analysis = () => {
       mode: 'bulk', // Always use bulk mode
       jobDetails,
       outputFields,
+      resumeFields,
       files: filesData,
       fileCount: selectedFiles.length,
       records: []
@@ -188,8 +271,8 @@ const Analysis = () => {
         console.log(`Extracting text from PDF ${i + 1}/${selectedFiles.length}: ${file.name}`);
         
         try {
-          const extractionResult = await pdfExtractionService.extractResumeData(file, jobDetails);
-          
+          const extractionResult = await pdfExtractionService.extractResumeData(file, jobDetails, resumeFields);
+          console.log('extractionResult', extractionResult);
           if (extractionResult.success) {
             extractedResumeData.push({
               fileName: file.name,
@@ -414,10 +497,10 @@ const Analysis = () => {
 
         {/* Right Column - Output Configuration */}
         <div className="space-y-6">
-          {/* Default Output Fields */}
+          {/* Analysis Fields */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Default Analysis Fields
+              Analysis Fields
             </h2>
             <div className="space-y-3">
               {defaultFields.map(field => (
@@ -434,6 +517,42 @@ const Analysis = () => {
                 </label>
               ))}
             </div>
+            
+            {/* Custom Analysis Fields */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Custom Analysis Fields</h3>
+              <div className="flex space-x-2 mb-4">
+                <input
+                  type="text"
+                  value={newCustomAnalysisField}
+                  onChange={(e) => setNewCustomAnalysisField(e.target.value)}
+                  placeholder="Add custom analysis field"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleAddCustomAnalysisField}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Add
+                </button>
+              </div>
+
+              {outputFields.customAnalysisFields.length > 0 && (
+                <div className="space-y-2">
+                  {outputFields.customAnalysisFields.map(field => (
+                    <div key={field.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm text-gray-700">{field.name}</span>
+                      <button
+                        onClick={() => handleRemoveCustomAnalysisField(field.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Resume Fields to Extract */}
@@ -442,59 +561,58 @@ const Analysis = () => {
               Resume Fields to Extract
             </h2>
             <div className="grid grid-cols-2 gap-2">
-              {resumeFields.map(field => (
-                <div key={field} className="flex items-center">
+              {defaultResumeFields.map(field => (
+                <label key={field.key} className="flex items-center">
                   <input
                     type="checkbox"
-                    defaultChecked
+                    checked={resumeFields[field.key]}
+                    onChange={() => handleResumeFieldChange(field.key)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   <span className="ml-2 text-sm text-gray-700">
-                    {field}
+                    {field.label}
                   </span>
-                </div>
+                </label>
               ))}
             </div>
-          </div>
-
-          {/* Custom Fields */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Custom Analysis Fields
-            </h2>
             
-            <div className="flex space-x-2 mb-4">
-              <input
-                type="text"
-                value={newCustomField}
-                onChange={(e) => setNewCustomField(e.target.value)}
-                placeholder="Add custom field name"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={handleAddCustomField}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Add
-              </button>
-            </div>
-
-            {outputFields.customFields.length > 0 && (
-              <div className="space-y-2">
-                {outputFields.customFields.map(field => (
-                  <div key={field.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                    <span className="text-sm text-gray-700">{field.name}</span>
-                    <button
-                      onClick={() => handleRemoveCustomField(field.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+            {/* Custom Resume Fields */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Custom Resume Fields</h3>
+              <div className="flex space-x-2 mb-4">
+                <input
+                  type="text"
+                  value={newCustomResumeField}
+                  onChange={(e) => setNewCustomResumeField(e.target.value)}
+                  placeholder="Add custom resume field"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleAddCustomResumeField}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Add
+                </button>
               </div>
-            )}
+
+              {resumeFields.customResumeFields.length > 0 && (
+                <div className="space-y-2">
+                  {resumeFields.customResumeFields.map(field => (
+                    <div key={field.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm text-gray-700">{field.name}</span>
+                      <button
+                        onClick={() => handleRemoveCustomResumeField(field.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
 
           {/* Start Analysis Button */}
           <div className="bg-white rounded-lg shadow-sm border p-6">

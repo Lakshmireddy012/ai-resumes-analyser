@@ -7,6 +7,7 @@ const AnalysisDetails = () => {
   const [analysis, setAnalysis] = useState(null);
   const [records, setRecords] = useState([]);
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [expandedFields, setExpandedFields] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +42,56 @@ const AnalysisDetails = () => {
       newExpanded.add(recordId);
     }
     setExpandedRows(newExpanded);
+  };
+
+  const toggleFieldExpansion = (fieldKey) => {
+    const newExpanded = new Set(expandedFields);
+    if (newExpanded.has(fieldKey)) {
+      newExpanded.delete(fieldKey);
+    } else {
+      newExpanded.add(fieldKey);
+    }
+    setExpandedFields(newExpanded);
+  };
+
+  const truncateText = (text, maxLength = 100) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
+  const renderExpandableField = (fieldKey, label, content, isLong = false) => {
+    if (!content || content === 'N/A') return null;
+    
+    const shouldTruncate = isLong && content.length > 100;
+    const isExpanded = expandedFields.has(fieldKey);
+    const displayContent = shouldTruncate && !isExpanded ? truncateText(content) : content;
+
+    return (
+      <div className="mb-4">
+        <div className="flex items-start justify-between">
+          <h4 className="font-medium text-gray-900 mb-2 flex items-center">
+            {shouldTruncate && (
+              <button
+                onClick={() => toggleFieldExpansion(fieldKey)}
+                className="mr-2 text-blue-600 hover:text-blue-800"
+              >
+                {isExpanded ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
+              </button>
+            )}
+            {label}
+          </h4>
+        </div>
+        <p className="text-sm text-gray-600 whitespace-pre-wrap">{displayContent}</p>
+      </div>
+    );
   };
 
   const getScoreColor = (score) => {
@@ -191,6 +242,9 @@ const AnalysisDetails = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                    {/* Expand/Collapse column */}
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Candidate
                   </th>
@@ -206,15 +260,28 @@ const AnalysisDetails = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Analyzed Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {records.map((record) => (
                   <Fragment key={record.id}>
                     <tr className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => toggleRowExpansion(record.id)}
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                        >
+                          {expandedRows.has(record.id) ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          )}
+                        </button>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
                           {record.fullName || 'N/A'}
@@ -241,91 +308,143 @@ const AnalysisDetails = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {record.analyzedAt ? new Date(record.analyzedAt).toLocaleDateString() : 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => toggleRowExpansion(record.id)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          {expandedRows.has(record.id) ? 'Collapse' : 'Expand'}
-                        </button>
-                      </td>
                     </tr>
                     
                     {/* Expanded Row */}
                     {expandedRows.has(record.id) && (
                       <tr>
                         <td colSpan="6" className="px-6 py-4 bg-gray-50">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {/* Skills Match */}
-                            {record.skillsMatch && (
-                              <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Skills Match</h4>
-                                <p className="text-sm text-gray-600">{record.skillsMatch}</p>
+                          <div className="space-y-8">
+                            {/* Analysis Results Section */}
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">
+                                Analysis Results
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {renderExpandableField(`${record.id}-skillsMatch`, 'Skills Match', record.skillsMatch, true)}
+                                {renderExpandableField(`${record.id}-experienceMatch`, 'Experience Match', record.experienceMatch, true)}
+                                {renderExpandableField(`${record.id}-educationMatch`, 'Education Match', record.educationMatch, true)}
+                                {renderExpandableField(`${record.id}-summary`, 'Executive Summary', record.summary, true)}
+                                {renderExpandableField(`${record.id}-strengths`, 'Key Strengths', record.strengths, true)}
+                                {renderExpandableField(`${record.id}-weaknesses`, 'Areas for Improvement', record.weaknesses, true)}
+                                {renderExpandableField(`${record.id}-recommendations`, 'Recommendations', record.recommendations, true)}
                               </div>
-                            )}
-                            
-                            {/* Experience Match */}
-                            {record.experienceMatch && (
-                              <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Experience Match</h4>
-                                <p className="text-sm text-gray-600">{record.experienceMatch}</p>
-                              </div>
-                            )}
-                            
-                            {/* Education Match */}
-                            {record.educationMatch && (
-                              <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Education Match</h4>
-                                <p className="text-sm text-gray-600">{record.educationMatch}</p>
-                              </div>
-                            )}
-                            
-                            {/* Summary */}
-                            {record.summary && (
-                              <div className="md:col-span-2 lg:col-span-3">
-                                <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
-                                <p className="text-sm text-gray-600">{record.summary}</p>
-                              </div>
-                            )}
-                            
-                            {/* Strengths */}
-                            {record.strengths && (
-                              <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Strengths</h4>
-                                <p className="text-sm text-gray-600">{record.strengths}</p>
-                              </div>
-                            )}
-                            
-                            {/* Weaknesses */}
-                            {record.weaknesses && (
-                              <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Areas for Improvement</h4>
-                                <p className="text-sm text-gray-600">{record.weaknesses}</p>
-                              </div>
-                            )}
-                            
-                            {/* Recommendations */}
-                            {record.recommendations && (
-                              <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Recommendations</h4>
-                                <p className="text-sm text-gray-600">{record.recommendations}</p>
-                              </div>
-                            )}
-                            
-                            {/* Custom Fields */}
-                            {record.customFields && record.customFields.length > 0 && (
-                              <div className="md:col-span-2 lg:col-span-3">
-                                <h4 className="font-medium text-gray-900 mb-2">Additional Information</h4>
-                                <div className="space-y-2">
-                                  {record.customFields.map((field, index) => (
-                                    <div key={index}>
-                                      <span className="font-medium text-gray-700">{field.name}:</span>
-                                      <span className="ml-2 text-sm text-gray-600">{field.value}</span>
+                            </div>
+
+                            {/* Resume Data Section */}
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">
+                                Extracted Resume Data
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {/* Personal Information */}
+                                {record.phone && record.phone !== 'N/A' && (
+                                  <div className="mb-4">
+                                    <h4 className="font-medium text-gray-900 mb-2">Phone</h4>
+                                    <p className="text-sm text-gray-600">{record.phone}</p>
+                                  </div>
+                                )}
+                                {record.address && record.address !== 'N/A' && (
+                                  <div className="mb-4">
+                                    <h4 className="font-medium text-gray-900 mb-2">Address</h4>
+                                    <p className="text-sm text-gray-600">{record.address}</p>
+                                  </div>
+                                )}
+                                {record.linkedin && record.linkedin !== 'N/A' && (
+                                  <div className="mb-4">
+                                    <h4 className="font-medium text-gray-900 mb-2">LinkedIn</h4>
+                                    <a href={record.linkedin} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                                      {record.linkedin}
+                                    </a>
+                                  </div>
+                                )}
+                                {record.github && record.github !== 'N/A' && (
+                                  <div className="mb-4">
+                                    <h4 className="font-medium text-gray-900 mb-2">GitHub</h4>
+                                    <a href={record.github} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                                      {record.github}
+                                    </a>
+                                  </div>
+                                )}
+
+                                {/* Education */}
+                                {record.education && Array.isArray(record.education) && record.education.length > 0 && (
+                                  <div className="md:col-span-2 lg:col-span-3">
+                                    <h4 className="font-medium text-gray-900 mb-2">Education</h4>
+                                    <div className="space-y-3">
+                                      {record.education.map((edu, index) => (
+                                        <div key={index} className="bg-white p-3 rounded border">
+                                          <div className="font-medium text-gray-900">{edu.degree}</div>
+                                          <div className="text-sm text-gray-600">{edu.institution}</div>
+                                          {edu.graduationYear && (
+                                            <div className="text-sm text-gray-500">{edu.graduationYear}</div>
+                                          )}
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
-                                </div>
+                                  </div>
+                                )}
+
+                                {/* Work Experience */}
+                                {record.workExperience && Array.isArray(record.workExperience) && record.workExperience.length > 0 && (
+                                  <div className="md:col-span-2 lg:col-span-3">
+                                    <h4 className="font-medium text-gray-900 mb-2">Work Experience</h4>
+                                    <div className="space-y-3">
+                                      {record.workExperience.map((exp, index) => (
+                                        <div key={index} className="bg-white p-3 rounded border">
+                                          <div className="font-medium text-gray-900">{exp.position}</div>
+                                          <div className="text-sm text-gray-600">{exp.company}</div>
+                                          <div className="text-sm text-gray-500">{exp.startDate} - {exp.endDate || 'Present'}</div>
+                                          {exp.description && (
+                                            <div className="text-sm text-gray-600 mt-2">{exp.description}</div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Skills */}
+                                {record.skills && Array.isArray(record.skills) && record.skills.length > 0 && (
+                                  <div className="md:col-span-2 lg:col-span-3">
+                                    <h4 className="font-medium text-gray-900 mb-2">Skills</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                      {record.skills.map((skill, index) => (
+                                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded">
+                                          {skill}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Projects */}
+                                {record.projects && Array.isArray(record.projects) && record.projects.length > 0 && (
+                                  <div className="md:col-span-2 lg:col-span-3">
+                                    <h4 className="font-medium text-gray-900 mb-2">Projects</h4>
+                                    <div className="space-y-3">
+                                      {record.projects.map((project, index) => (
+                                        <div key={index} className="bg-white p-3 rounded border">
+                                          <div className="font-medium text-gray-900">{project.name}</div>
+                                          {project.description && (
+                                            <div className="text-sm text-gray-600 mt-1">{project.description}</div>
+                                          )}
+                                          {project.technologies && Array.isArray(project.technologies) && (
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                              {project.technologies.map((tech, techIndex) => (
+                                                <span key={techIndex} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                                                  {tech}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </div>
                         </td>
                       </tr>
