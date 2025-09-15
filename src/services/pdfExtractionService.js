@@ -66,11 +66,12 @@ export class PDFExtractionService {
 
       // Use AI to extract structured resume data
       const resumeData = await this.extractStructuredData(pdfResult.text, jobDetails, resumeFields);
+      const enrichedData = this.enrichContactFields(resumeData, pdfResult.text);
       
       return {
         success: true,
         rawText: pdfResult.text,
-        structuredData: resumeData,
+        structuredData: enrichedData,
         metadata: pdfResult.metadata
       };
     } catch (error) {
@@ -224,6 +225,12 @@ export class PDFExtractionService {
 
     return `You are extracting resume data. Return ONLY valid JSON matching the schema below. Prefer exact facts; do not hallucinate. If unknown, use "N/A" or [] accordingly.
 
+Formatting rules for contact fields:
+- email: must be a valid email pattern, lower-case
+- linkedin: full https URL to a profile (e.g., https://www.linkedin.com/in/<handle>)
+- github: full https URL to a user/org (e.g., https://github.com/<handle>)
+- website: full https URL if present
+
 JOB CONTEXT:
 Title: ${jobDetails.title}
 Description: ${jobDetails.description || 'N/A'}
@@ -236,15 +243,111 @@ RESUME TEXT:
 ${text}`;
   }
 
+  enrichContactFields(data, text) {
+    const result = { ...(data || {}) };
+
+    const email = this.extractPrimaryEmail(text);
+    const linkedin = this.extractLinkedInUrl(text);
+    const github = this.extractGitHubUrl(text);
+    const website = this.extractWebsiteUrl(text);
+
+    if (!result.email || result.email === 'N/A') result.email = email || result.email || 'N/A';
+    if (!result.linkedin || result.linkedin === 'N/A') result.linkedin = linkedin || result.linkedin || 'N/A';
+    if (!result.github || result.github === 'N/A') result.github = github || result.github || 'N/A';
+    if (!result.website || result.website === 'N/A') result.website = website || result.website || 'N/A';
+
+    return result;
+  }
+
+  extractPrimaryEmail(text) {
+    if (!text) return null;
+    const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+    const matches = text.match(emailRegex);
+    if (!matches || matches.length === 0) return null;
+    // Pick the first sensible email
+    return matches[0].toLowerCase();
+  }
+
+  extractLinkedInUrl(text) {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/)?([a-z]{0,3}\.)?linkedin\.com\/(in|pub|profile)\/[a-zA-Z0-9\-_%]+\/?/gi;
+    const matches = text.match(urlRegex);
+    if (!matches || matches.length === 0) return null;
+    return this.normalizeUrl(matches[0]);
+  }
+
+  extractGitHubUrl(text) {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/)?(www\.)?github\.com\/[A-Za-z0-9\-_.]+\/?/gi;
+    const matches = text.match(urlRegex);
+    if (!matches || matches.length === 0) return null;
+    return this.normalizeUrl(matches[0]);
+  }
+
+  extractWebsiteUrl(text) {
+    if (!text) return null;
+    // Heuristic: look for portfolio/personal site lines if not linkedin/github
+    const urlRegex = /(https?:\/\/)[^\s)]+/gi;
+    const matches = text.match(urlRegex);
+    if (!matches || matches.length === 0) return null;
+    const filtered = matches.filter(u => !/linkedin\.com/i.test(u) && !/github\.com/i.test(u));
+    if (filtered.length === 0) return null;
+    return this.normalizeUrl(filtered[0]);
+  }
+
+  normalizeUrl(raw) {
+    try {
+      let url = raw.trim();
+      if (!/^https?:\/\//i.test(url)) {
+        url = `https://${url}`;
+      }
+      const u = new URL(url);
+      u.hash = '';
+      // Strip tracking params
+      ['utm_source','utm_medium','utm_campaign','utm_term','utm_content'].forEach(k => u.searchParams.delete(k));
+      return u.toString().replace(/\/$/, '');
+    } catch {
+      return raw;
+    }
+  }
+
   parseExtractionResponse(response) {
     try {
-      // Try to extract JSON from response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No valid JSON found in response');
+      // If the model returned an object already
+      if (typeof response === 'object') {
+        return response;
       }
+
+      const text = String(response || '');
+
+      // 1) Try direct parse
+      try {
+        return JSON.parse(text);
+      } catch {}
+
+      // 2) Try fenced json code block
+      const fencedJson = this.extractFencedJson(text, true) || this.extractFencedJson(text, false);
+      if (fencedJson) {
+        const parsed = this.tryParseWithSanitization(fencedJson);
+        if (parsed) return parsed;
+      }
+
+      // 3) Try first JSON-looking substring between outermost braces
+      const braceChunk = this.extractBraceChunk(text);
+      if (braceChunk) {
+        const parsed = this.tryParseWithSanitization(braceChunk);
+        if (parsed) return parsed;
+      }
+
+      // 4) Last attempt: sanitize entire text and parse
+      const sanitized = this.sanitizeJsonLike(text);
+      if (sanitized) {
+        try {
+          return JSON.parse(sanitized);
+        } catch {}
+      }
+
+      throw new Error('No valid JSON found in response');
     } catch (error) {
       console.error('JSON parsing error:', error);
       return {
@@ -262,6 +365,60 @@ ${text}`;
         summary: 'Extraction failed'
       };
     }
+  }
+
+  extractFencedJson(text, preferJsonTag = true) {
+    if (!text) return null;
+    const jsonTagged = /```\s*json\s*\n([\s\S]*?)```/i;
+    const anyTagged = /```\s*\n([\s\S]*?)```/i;
+    const match = (preferJsonTag ? text.match(jsonTagged) : null) || text.match(anyTagged);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    return null;
+  }
+
+  extractBraceChunk(text) {
+    const first = text.indexOf('{');
+    const last = text.lastIndexOf('}');
+    if (first !== -1 && last !== -1 && last > first) {
+      return text.slice(first, last + 1);
+    }
+    return null;
+  }
+
+  tryParseWithSanitization(text) {
+    try {
+      return JSON.parse(text);
+    } catch {}
+    const sanitized = this.sanitizeJsonLike(text);
+    if (!sanitized) return null;
+    try {
+      return JSON.parse(sanitized);
+    } catch {
+      return null;
+    }
+  }
+
+  sanitizeJsonLike(text) {
+    if (!text) return null;
+    let s = text.trim();
+    // Strip code fences if present
+    s = s.replace(/^```[\s\S]*?\n/, '').replace(/```\s*$/, '');
+    // Keep only content between first { and last }
+    const chunk = this.extractBraceChunk(s);
+    if (chunk) s = chunk;
+    // Remove trailing commas before } or ]
+    s = s.replace(/,(\s*[}\]])/g, '$1');
+    // Quote single-quoted keys: {'key': ...} -> {"key": ...}
+    s = s.replace(/([,{]\s*)'([^'\n\r]+?)'\s*:/g, '$1"$2":');
+    // Quote single-quoted string values: : 'value' -> : "value"
+    s = s.replace(/:\s*'([^'\n\r]*?)'/g, ': "$1"');
+    // Quote unquoted keys: { key: ... } -> { "key": ... }
+    s = s.replace(/([,{]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":');
+    // Normalize quotes in URLs possibly broken by replacement
+    s = s.replace(/\"(https?:[^\"]*?)\"/g, '"$1"');
+    return s;
   }
 
   basicTextParsing(text) {

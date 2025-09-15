@@ -503,7 +503,9 @@ Instructions:
 
       // Execute the chain with retry logic
       const result = await this.executeWithRetry(personalInfoChain, { rawText });
-      return result;
+      // Deterministic overlay for contact info
+      const overlay = this.regexOverlayContact(rawText);
+      return { ...result, ...overlay };
     } catch (error) {
       console.error('Error extracting personal info:', error);
       return {
@@ -782,6 +784,34 @@ Instructions:
 
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  regexOverlayContact(rawText) {
+    if (!rawText) return {};
+    const emailMatch = rawText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+    const linkedinMatch = rawText.match(/(https?:\/\/)?([a-z]{0,3}\.)?linkedin\.com\/(in|pub|profile)\/[a-zA-Z0-9\-_%]+\/?/i);
+    const githubMatch = rawText.match(/(https?:\/\/)?(www\.)?github\.com\/[A-Za-z0-9\-_.]+\/?/i);
+    const websiteMatchCandidates = rawText.match(/(https?:\/\/)[^\s)]+/gi) || [];
+    const websiteMatch = (websiteMatchCandidates.find(u => !/linkedin\.com/i.test(u) && !/github\.com/i.test(u)) || null);
+
+    const normalize = (url) => {
+      try {
+        let v = url;
+        if (!/^https?:\/\//i.test(v)) v = `https://${v}`;
+        const u = new URL(v);
+        u.hash = '';
+        return u.toString().replace(/\/$/, '');
+      } catch {
+        return url;
+      }
+    };
+
+    const out = {};
+    if (emailMatch) out.email = emailMatch[0].toLowerCase();
+    if (linkedinMatch) out.linkedin = normalize(linkedinMatch[0]);
+    if (githubMatch) out.github = normalize(githubMatch[0]);
+    if (websiteMatch) out.website = normalize(websiteMatch);
+    return out;
   }
 }
 
