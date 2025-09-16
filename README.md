@@ -17,6 +17,10 @@ A powerful, AI-driven web application for analyzing PDF resumes with intelligent
 - **📈 Bulk Processing**: Process multiple resumes simultaneously for efficient screening
 - **⚙️ Customizable Analysis**: Configure which fields to include in analysis output
 
+### How to use
+
+![AI_Resumes_Analyser](https://github.com/user-attachments/assets/b317baa4-1066-410e-9049-fa2a2b7ef1ca)
+
 ### Advanced Features
 - **🔧 Flexible Configuration**: Easy setup and management of LLM providers
 - **💾 Local Storage**: Secure local storage for configurations and analysis results
